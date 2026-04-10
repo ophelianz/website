@@ -126,15 +126,15 @@ const balancedFeatures: EngineFeature[] = [
 
 const sequentialFeatures: EngineFeature[] = [
   {
-    value: "On pause",
+    value: "Still chunked",
     valueClass: "text-accent",
   },
   {
-    value: "Better resume",
+    value: "Better resume support",
     valueClass: "text-secondary",
   },
   {
-    value: "Front first",
+    value: "Watch as you download",
     valueClass: "text-[#C4B5FD]",
   },
 ];
@@ -353,13 +353,6 @@ onUnmounted(() => {
             A faster
             <span class="font-normal text-on-surface-alt">download engine</span>
           </h2>
-          <p class="mx-auto mt-5 max-w-2xl text-[16px] leading-7 text-muted-fg">
-            This demo focuses on Ophelia&apos;s two intended range-aware
-            schedulers. Servers without range support or content length still
-            fall back to a simpler single-stream path outside this view. Also,
-            if this makes no sense to you- I'm sorry I tried my best to make
-            this look good lol just trust me
-          </p>
         </div>
       </RevealSection>
 
