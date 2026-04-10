@@ -55,10 +55,6 @@ watch(isVisible, (visible) => {
             It&apos;s the 21st century,
             <span class="font-normal text-on-surface-alt">just ditch IDM</span>
           </h2>
-          <p class="mx-auto mt-5 max-w-2xl text-[15px] leading-7 text-muted-fg">
-            Catch browser downloads, hand them to Ophelia, and skip the dated
-            popup-software routine entirely.
-          </p>
         </div>
       </RevealSection>
 
