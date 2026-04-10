@@ -2,16 +2,13 @@
 import type { Component } from "vue";
 import {
   ArrowLeftRight,
+  ArrowRight,
   Gauge,
   RotateCcw,
   Rows3,
-  ShieldCheck,
 } from "lucide-vue-next";
 
-interface EngineMode {
-  name: string;
-  accentClass: string;
-}
+type ModeId = "balanced" | "sequential";
 
 interface EngineAction {
   title: string;
@@ -21,117 +18,262 @@ interface EngineAction {
   activeClass: string;
 }
 
+interface EngineFeature {
+  value: string;
+  note: string;
+  valueClass?: string;
+}
+
 interface EngineState {
   speedBars: number[];
   rangeProgress: number[];
-  activeWorkers: number;
-  queuedChunks: number;
-  resumeSnapshots: number;
-  modeIndex: number;
+  coverage: number[];
   recoveryStage: number;
-  focusAction: number;
+  activeSteps: number[];
 }
 
-const recoveryLoop = ["Detect", "Retry", "Hedge"] as const;
+interface EngineModeConfig {
+  label: string;
+  badgeClass: string;
+  telemetryTitle: string;
+  telemetryLabel: string;
+  telemetryNote: string;
+  panelTitle: string;
+  panelNote: string;
+  actions: EngineAction[];
+  features: EngineFeature[];
+  states: EngineState[];
+}
 
-const modes: EngineMode[] = [
-  {
-    name: "Balanced",
-    accentClass: "text-accent border-accent/20 bg-accent/8",
-  },
-  {
-    name: "File-specific",
-    accentClass: "text-secondary border-secondary/20 bg-secondary/8",
-  },
-  {
-    name: "Sequential",
-    accentClass: "text-[#A78BFA] border-[#A78BFA]/20 bg-[#A78BFA]/8",
-  },
-];
+const recoveryTools = ["Retry", "Steal", "Hedge"] as const;
+const modeOrder: ModeId[] = ["balanced", "sequential"];
 
-const actions: EngineAction[] = [
+const balancedActions: EngineAction[] = [
   {
     title: "Probe",
-    note: "checks range support first",
-    icon: ShieldCheck,
+    note: "check range support, content length, and the final filename before opening any workers",
+    icon: Gauge,
     accentClass: "text-accent bg-accent/12 border-accent/16",
     activeClass: "border-accent/20 bg-accent/[0.06]",
   },
   {
-    title: "Split",
-    note: "turns one file into byte ranges",
+    title: "Queue",
+    note: "preallocate the part file, build chunk boundaries, and seed the pending range queue",
     icon: Rows3,
     accentClass: "text-secondary bg-secondary/12 border-secondary/16",
     activeClass: "border-secondary/20 bg-secondary/[0.06]",
   },
   {
-    title: "Balance",
-    note: "workers steal the slow tail",
+    title: "Ramp",
+    note: "start at one worker, then open more ranges as completed chunks free capacity",
     icon: ArrowLeftRight,
     accentClass: "text-[#A78BFA] bg-[#A78BFA]/12 border-[#A78BFA]/16",
     activeClass: "border-[#A78BFA]/20 bg-[#A78BFA]/[0.06]",
   },
   {
-    title: "Resume",
-    note: "keeps real transfer state",
+    title: "Recovery",
+    note: "retry inside workers, then steal or hedge the slow tail when spare capacity opens up",
     icon: RotateCcw,
     accentClass: "text-on-surface-alt bg-white/[0.06] border-white/[0.08]",
     activeClass: "border-white/[0.14] bg-white/[0.05]",
   },
 ];
 
-const engineStates: EngineState[] = [
+const sequentialActions: EngineAction[] = [
   {
-    speedBars: [8, 10, 12, 15, 18, 21, 23, 25, 27, 29, 31, 33],
-    rangeProgress: [14, 22, 8, 0],
-    activeWorkers: 2,
-    queuedChunks: 16,
-    resumeSnapshots: 2,
-    modeIndex: 0,
-    recoveryStage: 0,
-    focusAction: 0,
+    title: "Probe",
+    note: "check range support, content length, and the final filename before starting the queue",
+    icon: Gauge,
+    accentClass: "text-accent bg-accent/12 border-accent/16",
+    activeClass: "border-accent/20 bg-accent/[0.06]",
   },
   {
-    speedBars: [10, 13, 17, 20, 24, 28, 31, 33, 35, 37, 39, 38],
-    rangeProgress: [36, 48, 24, 12],
-    activeWorkers: 4,
-    queuedChunks: 10,
-    resumeSnapshots: 3,
-    modeIndex: 0,
-    recoveryStage: 0,
-    focusAction: 1,
+    title: "Queue",
+    note: "build normal chunk boundaries and keep them lined up in strict front-to-back order",
+    icon: Rows3,
+    accentClass: "text-secondary bg-secondary/12 border-secondary/16",
+    activeClass: "border-secondary/20 bg-secondary/[0.06]",
   },
   {
-    speedBars: [11, 15, 18, 22, 26, 30, 34, 37, 39, 37, 34, 31],
-    rangeProgress: [58, 72, 45, 34],
-    activeWorkers: 4,
-    queuedChunks: 6,
-    resumeSnapshots: 4,
-    modeIndex: 0,
-    recoveryStage: 1,
-    focusAction: 2,
+    title: "Advance",
+    note: "run one active range at a time, finish it, then advance to the next chunk in sequence",
+    icon: ArrowRight,
+    accentClass: "text-[#A78BFA] bg-[#A78BFA]/12 border-[#A78BFA]/16",
+    activeClass: "border-[#A78BFA]/20 bg-[#A78BFA]/[0.06]",
   },
   {
-    speedBars: [10, 13, 16, 19, 23, 27, 31, 34, 36, 34, 30, 26],
-    rangeProgress: [76, 88, 69, 58],
-    activeWorkers: 3,
-    queuedChunks: 3,
-    resumeSnapshots: 6,
-    modeIndex: 1,
-    recoveryStage: 2,
-    focusAction: 3,
-  },
-  {
-    speedBars: [8, 11, 14, 18, 21, 24, 28, 31, 33, 31, 28, 24],
-    rangeProgress: [91, 97, 85, 76],
-    activeWorkers: 2,
-    queuedChunks: 1,
-    resumeSnapshots: 7,
-    modeIndex: 2,
-    recoveryStage: 0,
-    focusAction: 2,
+    title: "Track",
+    note: "keep chunk-aware progress and coverage live while the ordered queue moves forward",
+    icon: RotateCcw,
+    accentClass: "text-on-surface-alt bg-white/[0.06] border-white/[0.08]",
+    activeClass: "border-white/[0.14] bg-white/[0.05]",
   },
 ];
+
+const balancedFeatures: EngineFeature[] = [
+  {
+    value: "On pause",
+    note: "The chunked engine writes snapshots only when a transfer pauses, not on every tick",
+    valueClass: "text-accent",
+  },
+  {
+    value: "Better resume support",
+    note: "Ophelia restores the last known slot state and file layout instead of guessing from file length",
+    valueClass: "text-secondary",
+  },
+  {
+    value: "Retry, Steal & Hedge",
+    note: "Slow workers can retry, and the scheduler can split or race the slow tail when capacity opens up",
+    valueClass: "text-[#C4B5FD]",
+  },
+];
+
+const sequentialFeatures: EngineFeature[] = [
+  {
+    value: "On pause",
+    note: "the same chunked engine writes pause snapshots only when the transfer actually stops",
+    valueClass: "text-accent",
+  },
+  {
+    value: "Better resume",
+    note: "resume restores the known front-to-back chunk queue instead of dropping to a plain stream",
+    valueClass: "text-secondary",
+  },
+  {
+    value: "Front first",
+    note: "one active slot keeps early bytes arriving in usable order for file types that benefit from it",
+    valueClass: "text-[#C4B5FD]",
+  },
+];
+
+// THIS MIGHT GIVE YOU A HEART ATTACK
+// SORRY ITS JUST EASIER </3
+const balancedStates: EngineState[] = [
+  {
+    speedBars: [8, 9, 11, 13, 16, 19, 23, 26, 29, 31, 33, 34],
+    rangeProgress: [14, 0, 0, 0],
+    coverage: [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 0,
+    activeSteps: [0],
+  },
+  {
+    speedBars: [10, 12, 15, 18, 22, 26, 30, 33, 36, 38, 40, 39],
+    rangeProgress: [32, 18, 7, 0],
+    coverage: [
+      2, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 0,
+    activeSteps: [1, 2],
+  },
+  {
+    speedBars: [12, 15, 18, 22, 27, 31, 35, 38, 40, 39, 36, 34],
+    rangeProgress: [56, 41, 27, 18],
+    coverage: [
+      2, 2, 1, 0, 2, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 0,
+    activeSteps: [2],
+  },
+  {
+    speedBars: [11, 15, 19, 24, 29, 34, 38, 40, 39, 36, 33, 30],
+    rangeProgress: [79, 54, 72, 31],
+    coverage: [
+      2, 2, 2, 1, 2, 2, 1, 0, 2, 1, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 1,
+    activeSteps: [2, 3],
+  },
+  {
+    speedBars: [9, 13, 17, 21, 26, 30, 34, 36, 35, 33, 30, 27],
+    rangeProgress: [100, 82, 93, 64],
+    coverage: [
+      2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 0, 2, 2, 1, 0, 2, 1, 0, 0,
+    ],
+    recoveryStage: 2,
+    activeSteps: [2, 3],
+  },
+];
+
+const sequentialStates: EngineState[] = [
+  {
+    speedBars: [7, 8, 10, 12, 15, 18, 20, 21, 22, 22, 21, 20],
+    rangeProgress: [18, 0, 0, 0],
+    coverage: [
+      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 0,
+    activeSteps: [0],
+  },
+  {
+    speedBars: [8, 10, 12, 14, 17, 20, 22, 23, 24, 24, 23, 22],
+    rangeProgress: [100, 18, 0, 0],
+    coverage: [
+      2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 0,
+    activeSteps: [1],
+  },
+  {
+    speedBars: [8, 10, 13, 15, 18, 21, 23, 24, 25, 25, 24, 23],
+    rangeProgress: [100, 100, 34, 0],
+    coverage: [
+      2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 0,
+    activeSteps: [2, 3],
+  },
+  {
+    speedBars: [7, 9, 12, 14, 17, 20, 22, 23, 24, 24, 23, 21],
+    rangeProgress: [100, 100, 100, 36],
+    coverage: [
+      2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0,
+    ],
+    recoveryStage: 0,
+    activeSteps: [2, 3],
+  },
+  {
+    speedBars: [6, 8, 11, 13, 16, 19, 21, 22, 22, 21, 20, 19],
+    rangeProgress: [100, 100, 100, 82],
+    coverage: [
+      2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1,
+    ],
+    recoveryStage: 0,
+    activeSteps: [2, 3],
+  },
+];
+
+const engineModes: Record<ModeId, EngineModeConfig> = {
+  balanced: {
+    label: "Balanced",
+    badgeClass: "border-accent/20 bg-accent/8 text-accent",
+    telemetryTitle: "Ramps up toward configured limits",
+    telemetryLabel: "Balanced download",
+    telemetryNote:
+      "starts at one worker, opens more ranges as chunks finish, and uses steal or hedge when the tail slows down",
+    panelTitle: "Balanced scheduler",
+    panelNote:
+      "Ophelia probes the server, builds the queue, ramps workers upward, and corrects the slow tail when capacity opens up.",
+    actions: balancedActions,
+    features: balancedFeatures,
+    states: balancedStates,
+  },
+  sequential: {
+    label: "Sequential",
+    badgeClass: "border-[#A78BFA]/20 bg-[#A78BFA]/8 text-[#C4B5FD]",
+    telemetryTitle: "Ordered, preview-friendly coverage",
+    telemetryLabel: "Sequential download",
+    telemetryNote: `Same chunk model as before, but one active range moves from the front of the file to the back.
+      This enables incrementally written files (such as .mkv) to be opened while they're downloading`,
+    panelTitle: "Sequential scheduler",
+    panelNote:
+      "Ophelia keeps the chunked executor, but schedules it front-to-back so early bytes arrive in usable order.",
+    actions: sequentialActions,
+    features: sequentialFeatures,
+    states: sequentialStates,
+  },
+};
 
 const ENGINE_CHART_WIDTH = 128;
 const ENGINE_CHART_HEIGHT = 52;
@@ -139,15 +281,30 @@ const BAR_WIDTH = 7;
 const BAR_GAP = 4;
 const ENGINE_GRID_LINES = [10, 26, 42] as const;
 
+const selectedMode = ref<ModeId>("balanced");
 const engineFrame = ref(0);
-const currentEngineState = computed(
-  () => engineStates[engineFrame.value % engineStates.length]!,
-);
 
-const activeMode = computed(() => modes[currentEngineState.value.modeIndex]!);
-const activeRecovery = computed(
-  () => recoveryLoop[currentEngineState.value.recoveryStage]!,
+const currentMode = computed(() => engineModes[selectedMode.value]);
+const currentEngineState = computed(
+  () =>
+    currentMode.value.states[
+      engineFrame.value % currentMode.value.states.length
+    ]!,
 );
+const activeRecovery = computed(
+  () => recoveryTools[currentEngineState.value.recoveryStage]!,
+);
+const activeSequentialRange = computed(() => {
+  const activeIndex = currentEngineState.value.rangeProgress.findIndex(
+    (progress) => progress > 0 && progress < 100,
+  );
+  if (activeIndex !== -1) return activeIndex;
+  const pendingIndex = currentEngineState.value.rangeProgress.findIndex(
+    (progress) => progress < 100,
+  );
+  if (pendingIndex !== -1) return pendingIndex;
+  return currentEngineState.value.rangeProgress.length - 1;
+});
 
 const speedRects = computed(() =>
   currentEngineState.value.speedBars.map((height, index) => ({
@@ -157,14 +314,12 @@ const speedRects = computed(() =>
   })),
 );
 
-const actionMetrics = computed(() => [
-  currentEngineState.value.rangeProgress[0]! >= 20 ? "range-ready" : "probing",
-  `${currentEngineState.value.activeWorkers} workers`,
-  activeRecovery.value.toLowerCase(),
-  `${currentEngineState.value.resumeSnapshots} snaps`,
-]);
-
 let engineTimer: ReturnType<typeof setInterval> | null = null;
+
+function selectMode(mode: ModeId) {
+  if (mode === selectedMode.value) return;
+  selectedMode.value = mode;
+}
 
 function rangeFillClass(index: number) {
   if (index === 0) return "bg-accent";
@@ -173,9 +328,20 @@ function rangeFillClass(index: number) {
   return "bg-white/[0.18]";
 }
 
+function coverageFillClass(cellState: number) {
+  if (cellState === 2) return "bg-accent";
+  if (cellState === 1) return "bg-secondary/80";
+  return "bg-white/[0.05]";
+}
+
+watch(selectedMode, () => {
+  engineFrame.value = 0;
+});
+
 onMounted(() => {
   engineTimer = setInterval(() => {
-    engineFrame.value = (engineFrame.value + 1) % engineStates.length;
+    const states = engineModes[selectedMode.value].states;
+    engineFrame.value = (engineFrame.value + 1) % states.length;
   }, 1700);
 });
 
@@ -185,20 +351,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="relative py-32">
+  <section class="relative flex items-center py-24 lg:min-h-[84vh]">
     <div class="mx-auto max-w-6xl px-6">
       <RevealSection>
-        <div class="mx-auto mb-14 max-w-3xl text-center">
-          <p
-            class="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-muted-fg"
-          >
-            Engine
-          </p>
+        <div class="mx-auto mb-10 max-w-3xl text-center">
           <h2 class="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            A real transfer engine,
-            <span class="font-normal text-on-surface-alt"
-              >not just a progress bar.</span
-            >
+            A faster
+            <span class="font-normal text-on-surface-alt">download engine</span>
           </h2>
           <p class="mx-auto mt-5 max-w-2xl text-[16px] leading-7 text-muted-fg">
             not exactly cutting edge; but an optimized Rust engine nonetheless
@@ -206,222 +365,261 @@ onUnmounted(() => {
         </div>
       </RevealSection>
 
-      <RevealSection :delay="60">
-        <div
-          class="overflow-hidden rounded-2xl border border-white/[0.07] bg-surface-card p-6 sm:p-7"
-        >
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div
-                class="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-fg"
-              >
-                Live engine telemetry
-              </div>
-              <div class="mt-1 text-[22px] font-bold tracking-tight">
-                {{ currentEngineState.activeWorkers }} active workers
-              </div>
-            </div>
-
-            <div
-              class="rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] transition-all duration-[1400ms]"
-              :class="activeMode.accentClass"
+      <RevealSection :delay="30">
+        <div class="mb-6 flex flex-col items-center gap-4">
+          <div
+            class="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-surface-card/90 p-1"
+          >
+            <button
+              v-for="mode in modeOrder"
+              :key="mode"
+              type="button"
+              class="rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition-all duration-300"
+              :class="
+                selectedMode === mode
+                  ? engineModes[mode].badgeClass
+                  : 'text-muted-fg hover:bg-white/[0.04] hover:text-on-surface'
+              "
+              @click="selectMode(mode)"
             >
-              {{ activeMode.name }}
-            </div>
+              {{ engineModes[mode].label }}
+            </button>
           </div>
 
-          <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-            <div
-              class="rounded-xl border border-white/[0.06] bg-surface-deep/70 p-4"
-            >
-              <svg
-                class="block h-[148px] w-full"
-                :viewBox="`0 0 ${ENGINE_CHART_WIDTH} ${ENGINE_CHART_HEIGHT}`"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient
-                    id="engine-bar-gradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    :y2="ENGINE_CHART_HEIGHT"
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop offset="0%" stop-color="rgb(89 251 181 / 0.95)" />
-                    <stop offset="100%" stop-color="rgb(89 251 181 / 0.18)" />
-                  </linearGradient>
-                </defs>
-
-                <line
-                  v-for="y in ENGINE_GRID_LINES"
-                  :key="y"
-                  x1="0"
-                  :x2="ENGINE_CHART_WIDTH"
-                  :y1="y"
-                  :y2="y"
-                  stroke="rgba(255,255,255,0.08)"
-                  stroke-width="1"
-                />
-
-                <rect
-                  v-for="bar in speedRects"
-                  :key="bar.x"
-                  :x="bar.x"
-                  :y="bar.y"
-                  :width="BAR_WIDTH"
-                  :height="bar.height"
-                  rx="2.5"
-                  fill="url(#engine-bar-gradient)"
-                  class="transition-all duration-[1400ms] ease-in-out"
-                />
-              </svg>
-
-              <div class="mt-4 grid gap-2">
-                <div
-                  v-for="(progress, index) in currentEngineState.rangeProgress"
-                  :key="index"
-                  class="grid grid-cols-[40px_minmax(0,1fr)_34px] items-center gap-2"
-                >
-                  <span
-                    class="text-[10px] uppercase tracking-[0.18em] text-muted-fg"
-                  >
-                    r{{ index + 1 }}
-                  </span>
-                  <div
-                    class="h-1.5 overflow-hidden rounded-full bg-white/[0.05]"
-                  >
-                    <div
-                      class="h-full rounded-full transition-all duration-[1400ms] ease-in-out"
-                      :class="rangeFillClass(index)"
-                      :style="{ width: `${progress}%` }"
-                    />
-                  </div>
-                  <span
-                    class="text-right text-[10px] tabular-nums text-on-surface-alt"
-                  >
-                    {{ progress }}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="grid gap-3">
-              <div
-                class="rounded-xl border border-white/[0.06] bg-surface-deep/70 p-4"
-              >
-                <div
-                  class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-fg"
-                >
-                  Queue
-                </div>
-                <div
-                  class="mt-2 text-[28px] font-bold leading-none tabular-nums"
-                >
-                  {{ currentEngineState.queuedChunks }}
-                </div>
-                <div class="mt-1 text-[12px] text-on-surface-alt">
-                  chunks waiting
-                </div>
-              </div>
-
-              <div
-                class="rounded-xl border border-white/[0.06] bg-surface-deep/70 p-4"
-              >
-                <div
-                  class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-fg"
-                >
-                  Resume
-                </div>
-                <div
-                  class="mt-2 text-[28px] font-bold leading-none tabular-nums"
-                >
-                  {{ currentEngineState.resumeSnapshots }}
-                </div>
-                <div class="mt-1 text-[12px] text-on-surface-alt">
-                  stored snapshots
-                </div>
-              </div>
-
-              <div
-                class="rounded-xl border border-white/[0.06] bg-surface-deep/70 p-4"
-              >
-                <div
-                  class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-fg"
-                >
-                  Recovery
-                </div>
-                <div class="mt-2 flex items-center gap-2">
-                  <span
-                    class="h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_14px_rgba(89,251,181,0.4)] transition-all duration-[1400ms]"
-                  />
-                  <span class="text-[16px] font-bold tracking-tight">
-                    {{ activeRecovery }}
-                  </span>
-                </div>
-                <div class="mt-1 text-[12px] text-on-surface-alt">
-                  handling the slow tail
-                </div>
-              </div>
-            </div>
-          </div>
+          <p class="max-w-2xl text-center text-[12px] leading-6 text-muted-fg">
+            This demo focuses on Ophelia&apos;s two intended range-aware
+            schedulers. Servers without range support or content length still
+            fall back to a simpler single-stream path outside this view.
+          </p>
         </div>
       </RevealSection>
 
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <RevealSection
-          v-for="(action, index) in actions"
-          :key="action.title"
-          :delay="120 + index * 60"
-        >
+      <div
+        class="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]"
+      >
+        <RevealSection :delay="60">
           <div
-            class="rounded-2xl border p-5 transition-all duration-[1400ms]"
-            :class="
-              index === currentEngineState.focusAction
-                ? action.activeClass
-                : 'border-white/[0.07] bg-surface-card'
-            "
+            class="flex h-full min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-surface-card p-6 sm:p-7"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div
-                class="flex h-11 w-11 items-center justify-center rounded-xl border"
-                :class="action.accentClass"
-              >
-                <component :is="action.icon" :size="18" :stroke-width="2" />
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="mt-1 text-[22px] font-bold tracking-tight">
+                  {{ currentMode.telemetryTitle }}
+                </div>
+                <div class="mt-1 text-[12px] text-on-surface-alt">
+                  {{ currentMode.telemetryNote }}
+                </div>
               </div>
-              <span
-                class="rounded-full border border-white/[0.07] bg-surface-raised px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-on-surface-alt"
-              >
-                {{ actionMetrics[index] }}
-              </span>
             </div>
 
-            <div class="mt-4">
-              <h3 class="text-[17px] font-bold tracking-tight">
-                {{ action.title }}
-              </h3>
-              <p class="mt-1 text-[13px] leading-5 text-on-surface-alt">
-                {{ action.note }}
-              </p>
-            </div>
-
-            <div class="mt-4 h-1 overflow-hidden rounded-full bg-white/[0.05]">
+            <div
+              class="mt-5 grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_220px]"
+            >
               <div
-                class="h-full rounded-full transition-all duration-[1400ms] ease-in-out"
+                class="rounded-xl border border-white/[0.06] bg-surface-deep/70 p-4"
+              >
+                <div
+                  class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-fg"
+                >
+                  Throughput
+                </div>
+
+                <svg
+                  class="mt-3 block h-[150px] w-full"
+                  :viewBox="`0 0 ${ENGINE_CHART_WIDTH} ${ENGINE_CHART_HEIGHT}`"
+                  preserveAspectRatio="none"
+                >
+                  <defs>
+                    <linearGradient
+                      id="engine-bar-gradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      :y2="ENGINE_CHART_HEIGHT"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop offset="0%" stop-color="rgb(89 251 181 / 0.95)" />
+                      <stop offset="100%" stop-color="rgb(89 251 181 / 0.18)" />
+                    </linearGradient>
+                  </defs>
+
+                  <line
+                    v-for="y in ENGINE_GRID_LINES"
+                    :key="y"
+                    x1="0"
+                    :x2="ENGINE_CHART_WIDTH"
+                    :y1="y"
+                    :y2="y"
+                    stroke="rgba(255,255,255,0.08)"
+                    stroke-width="1"
+                  />
+
+                  <rect
+                    v-for="bar in speedRects"
+                    :key="bar.x"
+                    :x="bar.x"
+                    :y="bar.y"
+                    :width="BAR_WIDTH"
+                    :height="bar.height"
+                    rx="2.5"
+                    fill="url(#engine-bar-gradient)"
+                    class="transition-all duration-[1400ms] ease-in-out"
+                  />
+                </svg>
+
+                <div class="mt-5 grid gap-2">
+                  <div
+                    v-for="(
+                      progress, index
+                    ) in currentEngineState.rangeProgress"
+                    :key="index"
+                    class="grid grid-cols-[52px_minmax(0,1fr)_34px] items-center gap-2"
+                  >
+                    <span
+                      class="text-[10px] uppercase tracking-[0.18em] text-muted-fg"
+                    >
+                      Slot {{ index + 1 }}
+                    </span>
+                    <div
+                      class="h-1.5 overflow-hidden rounded-full bg-white/[0.05]"
+                    >
+                      <div
+                        class="h-full rounded-full transition-all duration-[1400ms] ease-in-out"
+                        :class="rangeFillClass(index)"
+                        :style="{ width: `${progress}%` }"
+                      />
+                    </div>
+                    <span
+                      class="text-right text-[10px] tabular-nums text-on-surface-alt"
+                    >
+                      {{ progress }}%
+                    </span>
+                  </div>
+                </div>
+
+                <div class="mt-5">
+                  <div
+                    class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-fg"
+                  >
+                    Coverage map
+                  </div>
+                  <div class="mt-3 grid grid-cols-12 gap-1">
+                    <div
+                      v-for="(cell, index) in currentEngineState.coverage"
+                      :key="index"
+                      class="h-3 rounded-[4px] transition-all duration-[1400ms] ease-in-out"
+                      :class="coverageFillClass(cell)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-3">
+                <div
+                  v-for="feature in currentMode.features"
+                  class="rounded-xl border border-white/[0.06] bg-surface-deep/70 p-4"
+                >
+                  <div
+                    class="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-fg"
+                  ></div>
+                  <div
+                    class="mt-2 text-[22px] font-bold leading-none tracking-tight"
+                    :class="feature.valueClass ?? ''"
+                  >
+                    {{ feature.value }}
+                  </div>
+                  <div class="mt-1 text-[12px] text-on-surface-alt">
+                    {{ feature.note }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </RevealSection>
+
+        <RevealSection :delay="120">
+          <div
+            class="flex h-full min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-surface-card p-6"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="mt-1 text-[22px] font-bold tracking-tight">
+                  {{ currentMode.panelTitle }}
+                </div>
+                <div class="mt-1 text-[12px] text-on-surface-alt">
+                  {{ currentMode.panelNote }}
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
+              <div
+                v-for="(action, index) in currentMode.actions"
+                :key="action.title"
+                class="rounded-2xl border p-5 transition-all duration-[1400ms]"
                 :class="
-                  index === 0
-                    ? 'bg-accent'
-                    : index === 1
-                      ? 'bg-secondary'
-                      : index === 2
-                        ? 'bg-[#A78BFA]'
-                        : 'bg-white/[0.45]'
+                  currentEngineState.activeSteps.includes(index)
+                    ? action.activeClass
+                    : 'border-white/[0.07] bg-surface-deep/70'
                 "
-                :style="{
-                  width:
-                    index === currentEngineState.focusAction ? '100%' : '38%',
-                }"
-              />
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div
+                    class="flex h-11 w-11 items-center justify-center rounded-xl border"
+                    :class="action.accentClass"
+                  >
+                    <component :is="action.icon" :size="18" :stroke-width="2" />
+                  </div>
+                </div>
+
+                <div class="mt-4">
+                  <h3 class="text-[17px] font-bold tracking-tight">
+                    {{ action.title }}
+                  </h3>
+                  <p class="mt-1 text-[13px] leading-5 text-on-surface-alt">
+                    {{ action.note }}
+                  </p>
+                  <div
+                    v-if="
+                      selectedMode === 'balanced' && action.title === 'Recovery'
+                    "
+                    class="mt-3 inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-on-surface-alt"
+                  >
+                    Now: {{ activeRecovery }}
+                  </div>
+                  <div
+                    v-else-if="
+                      selectedMode === 'sequential' &&
+                      action.title === 'Advance'
+                    "
+                    class="mt-3 inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-on-surface-alt"
+                  >
+                    Active slot {{ activeSequentialRange + 1 }}
+                  </div>
+                </div>
+
+                <div
+                  class="mt-5 h-1 overflow-hidden rounded-full bg-white/[0.05]"
+                >
+                  <div
+                    class="h-full rounded-full transition-all duration-[1400ms] ease-in-out"
+                    :class="
+                      index === 0
+                        ? 'bg-accent'
+                        : index === 1
+                          ? 'bg-secondary'
+                          : index === 2
+                            ? 'bg-[#A78BFA]'
+                            : 'bg-white/[0.45]'
+                    "
+                    :style="{
+                      width: currentEngineState.activeSteps.includes(index)
+                        ? '100%'
+                        : '38%',
+                    }"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </RevealSection>
