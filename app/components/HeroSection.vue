@@ -48,10 +48,14 @@ const speedDisplay = computed(() =>
   String(Math.round(speedPoints.value[speedPoints.value.length - 1]!)),
 );
 
+function valueToChartY(v: number): number {
+  return CHART_H - (v / SPEED_MAX) * CHART_H;
+}
+
 function buildPath(pts: number[], close: boolean): string {
   const points = pts.map((v, i) => ({
     x: (i / (pts.length - 1)) * CHART_W,
-    y: CHART_H - (v / SPEED_MAX) * CHART_H,
+    y: valueToChartY(v),
   }));
   let d = `M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}`;
   for (let i = 1; i < points.length; i++) {
@@ -492,9 +496,6 @@ onUnmounted(() => {
                         >
                         <span class="text-[10px] text-muted-fg">MB/s</span>
                       </div>
-                      <div class="text-[9px] text-muted-fg mt-0.5 font-medium">
-                        Download speed
-                      </div>
                     </div>
                     <svg
                       class="w-full h-[54px] mt-1"
@@ -504,25 +505,26 @@ onUnmounted(() => {
                       <defs>
                         <linearGradient
                           id="speed-grad"
+                          gradientUnits="userSpaceOnUse"
                           x1="0"
-                          y1="0"
+                          y1="-2"
                           x2="0"
-                          y2="1"
+                          :y2="CHART_H + 10"
                         >
                           <stop
                             offset="0%"
                             class="[stop-color:theme(colors.accent)]"
-                            stop-opacity="0.4"
+                            stop-opacity="0.48"
                           />
                           <stop
-                            offset="60%"
+                            offset="58%"
                             class="[stop-color:theme(colors.accent)]"
-                            stop-opacity="0.2"
+                            stop-opacity="0.18"
                           />
                           <stop
                             offset="100%"
                             class="[stop-color:theme(colors.accent)]"
-                            stop-opacity="0.01"
+                            stop-opacity="0"
                           />
                         </linearGradient>
                       </defs>
@@ -543,16 +545,7 @@ onUnmounted(() => {
                   <div
                     class="rounded-lg border border-white/[0.07] bg-surface-card p-2.5"
                   >
-                    <div class="flex items-center justify-between mb-2">
-                      <span
-                        class="text-[9px] text-muted-fg font-semibold uppercase tracking-wider"
-                        >Chunks</span
-                      >
-                      <span
-                        class="text-[9px] text-accent font-bold tabular-nums"
-                        >{{ progress }}%</span
-                      >
-                    </div>
+                    <!--div class="flex items-center justify-between mb-2"></div>-->
                     <div
                       class="grid gap-[2.5px]"
                       :style="{
@@ -583,7 +576,7 @@ onUnmounted(() => {
                   <button
                     class="text-[11px] text-muted-fg hover:text-on-surface-alt"
                   >
-                    Clear finished
+                    Clear
                   </button>
                 </div>
 
