@@ -1,12 +1,11 @@
 <template>
   <div>
     <HeroSection />
-    <LazyDitchIdmSection />
-    <LazyPluginsSection />
-    <!-- <LazyComparisonSection /> -->
     <LazyEngineSection />
+    <LazyDitchIdmSection />
+    <!-- LazyPluginsSection /> -->
+    <!-- <LazyComparisonSection /> -->
     <LazyCtaSection />
   </div>
 </template>
-<script setup lang="ts">
-</script>
+<script setup lang="ts"></script>
