@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     "@nuxtjs/google-fonts",
     "@nuxt/content",
     "@vercel/analytics",
+    "@vercel/speed-insights",
     "@nuxt/icon",
   ],
 
