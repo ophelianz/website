@@ -303,7 +303,7 @@ onUnmounted(() => {
       <div class="mx-auto max-w-4xl text-center">
         <RevealSection :delay="100">
           <h1
-            class="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6"
+            class="mx-auto max-w-3xl text-center text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6"
           >
             Ophelia,
             <span class="text-on-surface-alt font-normal"
@@ -516,7 +516,7 @@ onUnmounted(() => {
             <div class="flex-1 px-4 py-4 flex flex-col gap-3 min-w-0">
               <!-- Top row: stats bar + chunk map -->
               <div
-                class="grid grid-cols-1 min-[700px]:grid-cols-[minmax(0,1fr)_240px] gap-2.5 items-stretch"
+                class="grid grid-cols-1 min-[700px]:grid-cols-[minmax(0,1fr)_300px] gap-2.5 items-stretch"
               >
                 <div
                   class="rounded-xl border border-white/[0.07] bg-surface-card px-4 py-4"
@@ -650,7 +650,7 @@ onUnmounted(() => {
                 </div>
 
                 <div
-                  class="min-w-0 h-full rounded-xl border border-white/[0.07] bg-surface-card px-3 py-3 overflow-hidden flex flex-col"
+                  class="grid min-w-0 h-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-xl border border-white/[0.07] bg-surface-card px-3 py-3 overflow-hidden"
                 >
                   <div class="flex items-center justify-between gap-3">
                     <span class="min-w-0 truncate text-[11px] text-on-surface">
@@ -662,12 +662,15 @@ onUnmounted(() => {
                   </div>
 
                   <div
-                    class="mt-3 flex min-h-[110px] flex-1 flex-col justify-between gap-1.5"
+                    class="mt-3 grid min-h-[132px] min-w-0 flex-1 gap-1.5 overflow-hidden"
+                    :style="{
+                      gridTemplateRows: `repeat(${CHUNK_ROWS}, minmax(0, 1fr))`,
+                    }"
                   >
                     <div
                       v-for="row in CHUNK_ROWS"
                       :key="row"
-                      class="grid min-w-0 flex-1 gap-1"
+                      class="grid min-h-0 min-w-0 gap-1"
                       :style="{
                         gridTemplateColumns: `repeat(${CHUNK_COLS}, 1fr)`,
                       }"
@@ -675,7 +678,7 @@ onUnmounted(() => {
                       <div
                         v-for="col in CHUNK_COLS"
                         :key="`${row}-${col}`"
-                        class="h-full min-h-[8px] min-w-0 rounded-[2px] transition-colors duration-300"
+                        class="min-h-0 min-w-0 rounded-[2px] transition-colors duration-300"
                         :class="cellClass(col - 1, row - 1)"
                       />
                     </div>
