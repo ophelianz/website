@@ -43,13 +43,11 @@ const browsers = [
   {
     label: "Chrome",
     icon: "simple-icons:googlechrome",
-    detail: "Send links to Ophelia",
     href: "https://github.com/ophelianz/ophelia",
   },
   {
     label: "Firefox",
     icon: "simple-icons:firefox",
-    detail: "Send links to Ophelia",
     href: "https://github.com/ophelianz/ophelia",
   },
 ] as const;
@@ -315,10 +313,6 @@ onMounted(() => {
                     <div class="text-[18px] font-bold tracking-tight">
                       {{ browser.label }}
                     </div>
-                    <div class="mt-1 text-[12px] leading-5 text-on-surface-alt">
-                      {{ browser.detail }}
-                    </div>
-
                     <div class="mt-4">
                       <span
                         class="inline-flex items-center gap-2 rounded-xl border border-white/[0.09] bg-black/45 px-3.5 py-2 text-[13px] font-semibold text-on-surface transition-colors group-hover:text-accent"
