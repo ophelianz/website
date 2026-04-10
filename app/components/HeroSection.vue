@@ -6,6 +6,7 @@ import {
   X,
   Inbox,
   Download,
+  HardDrive,
   FileCog,
   FileText,
   Film,
@@ -17,14 +18,15 @@ import {
 
 const progress = ref(0);
 const downloadDone = ref(false);
-const mockupEl = ref<HTMLElement | null>(null);
+const isCompactSidebar = ref(false);
 
 // Layout constants
 const SPEED_MAX = 300;
 const CHART_W = 100;
 const CHART_H = 40;
-const CHUNK_COLS = 14;
-const CHUNK_ROWS = 6;
+const CHUNK_COLS = 16;
+const CHUNK_ROWS = 8;
+const GRID_LINES = [0, 0.5, 1] as const;
 
 // Timing
 const CYCLE_DURATION = 7000;
@@ -42,10 +44,21 @@ function generateInitialPoints(): number[] {
 }
 
 const speedPoints = ref<number[]>(generateInitialPoints());
+const currentSpeed = computed(
+  () => speedPoints.value[speedPoints.value.length - 1] ?? 0,
+);
+const finishedTotal = ref(184);
+const activeTransfers = ref(3);
+const queuedTransfers = ref(6);
 
-// exclamation mark because typescript wont stfu about these
-const speedDisplay = computed(() =>
-  String(Math.round(speedPoints.value[speedPoints.value.length - 1]!)),
+const speedDisplay = computed(() => currentSpeed.value.toFixed(1));
+const readSpeedDisplay = computed(() => (currentSpeed.value * 0.78).toFixed(1));
+const writeSpeedDisplay = computed(() =>
+  (currentSpeed.value * 0.41).toFixed(1),
+);
+const chunkMapItem = computed(
+  () =>
+    queue.value.find((item) => item.status === "downloading") ?? queue.value[0],
 );
 
 function valueToChartY(v: number): number {
@@ -76,34 +89,31 @@ function buildPath(pts: number[], close: boolean): string {
 const linePath = computed(() => buildPath(speedPoints.value, false));
 const areaPath = computed(() => buildPath(speedPoints.value, true));
 
-// chunks section
-// based on the github contributions animation by @hamedmp
-// https://github.com/jaretpeerson/toggleSupply/blob/main/public/scripts/components/githubContributions.js
 const cellThresholds: number[][] = Array.from(
   { length: CHUNK_COLS },
   (_, col) =>
     Array.from(
       { length: CHUNK_ROWS },
-      () => (col + Math.random()) / CHUNK_COLS,
+      (_, row) => (col + row * 0.35 + Math.random() * 0.45) / CHUNK_COLS,
     ),
 );
 
-const PARTIAL_WINDOW = 0.045;
+const PARTIAL_WINDOW = 0.06;
 
 type CellState = "filled" | "partial" | "empty";
 
 function getCellState(col: number, row: number): CellState {
-  const t = cellThresholds[col]![row]!;
-  const p = progress.value / 100;
-  if (p >= t) return "filled";
-  if (p >= t - PARTIAL_WINDOW) return "partial";
+  const threshold = cellThresholds[col]![row]!;
+  const normalized = progress.value / 100;
+  if (normalized >= threshold) return "filled";
+  if (normalized >= threshold - PARTIAL_WINDOW) return "partial";
   return "empty";
 }
 
-function cellClass(col: number, row: number): string {
-  const s = getCellState(col, row);
-  if (s === "filled") return "chunk-filled";
-  if (s === "partial") return "chunk-partial";
+function cellClass(col: number, row: number) {
+  const state = getCellState(col, row);
+  if (state === "filled") return "chunk-filled";
+  if (state === "partial") return "chunk-partial";
   return "chunk-empty";
 }
 
@@ -200,9 +210,16 @@ const queue = ref<QueueItem[]>([
 
 let speedTimer: ReturnType<typeof setInterval> | null = null;
 let loopTimeout: ReturnType<typeof setTimeout> | null = null;
+let sidebarMedia: MediaQueryList | null = null;
+let handleSidebarMediaChange:
+  | ((event: MediaQueryList | MediaQueryListEvent) => void)
+  | null = null;
 
 function onDownloadComplete() {
   downloadDone.value = true;
+  finishedTotal.value += 1;
+  activeTransfers.value = 2;
+  queuedTransfers.value = 5;
   // mark front item finished so it shows the finished badge briefly
   queue.value = [
     { ...queue.value[0]!, status: "finished" as ItemStatus },
@@ -218,6 +235,8 @@ function onDownloadComplete() {
 function startCycle() {
   downloadDone.value = false;
   progress.value = 0;
+  activeTransfers.value = 3;
+  queuedTransfers.value = 6;
   // promote front queued item to downloading
   queue.value = [
     { ...queue.value[0]!, status: "downloading" as ItemStatus },
@@ -239,10 +258,12 @@ function startCycle() {
 }
 
 onMounted(() => {
-  if (mockupEl.value) {
-    const w = mockupEl.value.offsetWidth;
-    mockupEl.value.style.width = `${w}px`;
-  }
+  sidebarMedia = window.matchMedia("(max-width: 699px)");
+  handleSidebarMediaChange = (event?: MediaQueryList | MediaQueryListEvent) => {
+    isCompactSidebar.value = (event ?? sidebarMedia!).matches;
+  };
+  handleSidebarMediaChange(sidebarMedia);
+  sidebarMedia.addEventListener("change", handleSidebarMediaChange);
 
   startCycle();
 
@@ -268,6 +289,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (sidebarMedia && handleSidebarMediaChange) {
+    sidebarMedia.removeEventListener("change", handleSidebarMediaChange);
+  }
   if (speedTimer) clearInterval(speedTimer);
   if (loopTimeout) clearTimeout(loopTimeout);
 });
@@ -275,432 +299,538 @@ onUnmounted(() => {
 
 <template>
   <section class="relative flex items-center justify-center pt-32 pb-20">
-    <div class="max-w-7xl mx-auto px-6 w-full">
-      <div
-        class="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-12 lg:gap-16 items-start"
-      >
-        <!-- Hero copy -->
-        <div>
-          <RevealSection>
-            <div
-              class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-outline text-xs font-bold text-on-surface-alt mb-8"
-            >
-              <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              alpha / v0.1.0
-            </div>
-          </RevealSection>
-
-          <RevealSection :delay="100">
-            <h1
-              class="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6"
-            >
-              Ophelia,<br />
-              <span class="text-on-surface-alt font-normal"
-                >an extensible download manager.</span
-              >
-            </h1>
-          </RevealSection>
-
-          <RevealSection :delay="200">
-            <p
-              class="text-lg text-on-surface-alt max-w-md mb-8 leading-relaxed font-normal"
-            >
-              Ophelia is rapidly developing, you can help out for free!
-            </p>
-          </RevealSection>
-
-          <RevealSection :delay="300">
-            <div class="flex flex-col gap-3">
-              <a
-                href="https://github.com/ophelianz/ophelia/discussions/categories/feature-requests"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex items-center gap-2 text-[14px] text-on-surface-alt hover:text-on-surface transition-colors duration-200 group"
-              >
-                <ArrowRight
-                  :size="13"
-                  :stroke-width="2"
-                  class="group-hover:translate-x-0.5 transition-transform duration-200"
-                />
-                Suggest Feedback
-              </a>
-              <a
-                href="https://github.com/ophelianz/ophelia/issues/new/choose"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex items-center gap-2 text-[14px] text-on-surface-alt hover:text-on-surface transition-colors duration-200 group"
-              >
-                <ArrowRight
-                  :size="13"
-                  :stroke-width="2"
-                  class="group-hover:translate-x-0.5 transition-transform duration-200"
-                />
-                Report a Bug
-              </a>
-            </div>
-          </RevealSection>
-        </div>
-
-        <!-- App mockup -->
-        <RevealSection :delay="200">
-          <div
-            ref="mockupEl"
-            class="rounded-2xl overflow-hidden border border-white/[0.07] ml-auto bg-surface-deep"
+    <div class="mx-auto w-full max-w-[1600px] px-6">
+      <div class="mx-auto max-w-4xl text-center">
+        <RevealSection :delay="100">
+          <h1
+            class="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6"
           >
-            <!-- Titlebar -->
-            <div
-              class="flex items-center h-12 px-4 border-b border-white/[0.07] bg-surface-raised"
+            Ophelia,
+            <span class="text-on-surface-alt font-normal"
+              >an extensible download manager.</span
             >
-              <div class="flex gap-2">
-                <div
-                  v-for="color in MACOS_DOTS"
-                  :key="color"
-                  class="w-3.5 h-3.5 rounded-full"
-                  :style="{ background: color }"
-                />
+          </h1>
+        </RevealSection>
+      </div>
+
+      <!-- App mockup -->
+      <RevealSection :delay="200">
+        <div
+          class="mx-auto mt-6 w-full min-[700px]:w-[85vw] max-w-[1360px] overflow-hidden rounded-2xl border border-white/[0.07] bg-surface-deep"
+        >
+          <!-- Titlebar -->
+          <div
+            class="flex items-center h-12 px-4 border-b border-white/[0.07] bg-surface-raised"
+          >
+            <div class="flex gap-2">
+              <div
+                v-for="color in MACOS_DOTS"
+                :key="color"
+                class="w-3.5 h-3.5 rounded-full"
+                :style="{ background: color }"
+              />
+            </div>
+            <div class="flex-1 flex justify-center">
+              <div
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-hover/40"
+              >
+                <svg
+                  class="w-3.5 h-3.5 text-muted-fg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" stroke-linecap="round" />
+                </svg>
+                <span class="text-[12px] text-muted-fg"
+                  >Search downloads...</span
+                >
               </div>
-              <div class="flex-1 flex justify-center">
+            </div>
+          </div>
+
+          <div class="flex min-w-0">
+            <!-- Mini sidebar -->
+            <div
+              class="shrink-0 border-r border-white/[0.07] bg-surface-raised transition-all duration-300"
+              :class="
+                isCompactSidebar
+                  ? 'w-[56px] px-2 py-4 flex flex-col items-center gap-3'
+                  : 'w-[180px] px-4 py-5 flex flex-col gap-4'
+              "
+            >
+              <!-- Logo -->
+              <div class="mb-2" :class="isCompactSidebar ? '' : 'px-1'">
+                <OpheliaLogo v-if="isCompactSidebar" :size="24" />
+                <Wordmark v-else :width="168" class="block" />
+              </div>
+
+              <!-- New download btn -->
+              <button
+                class="rounded-md bg-accent text-bg text-[12px] font-semibold transition-all duration-200"
+                :class="
+                  isCompactSidebar
+                    ? 'flex h-10 w-10 items-center justify-center'
+                    : 'flex w-full items-center gap-2 px-3 py-3'
+                "
+              >
+                <Download :size="14" :stroke-width="2.5" />
+                <span v-if="!isCompactSidebar">Download</span>
+              </button>
+
+              <div
+                class="h-px bg-white/[0.07]"
+                :class="isCompactSidebar ? 'w-8' : ''"
+              />
+
+              <!-- Nav -->
+              <div class="flex flex-col gap-0.5">
                 <div
-                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-hover/40"
+                  class="rounded-md text-[12px] font-semibold bg-surface-hover"
+                  :class="
+                    isCompactSidebar
+                      ? 'flex h-10 w-10 items-center justify-center'
+                      : 'flex items-center gap-2.5 px-3 py-3'
+                  "
+                >
+                  <Inbox :size="15" :stroke-width="2" />
+                  <span v-if="!isCompactSidebar">Downloads</span>
+                </div>
+                <div
+                  class="rounded-md text-[12px] text-muted-fg"
+                  :class="
+                    isCompactSidebar
+                      ? 'flex h-10 w-10 items-center justify-center'
+                      : 'flex items-center gap-2.5 px-3 py-3'
+                  "
                 >
                   <svg
-                    class="w-3.5 h-3.5 text-muted-fg"
+                    class="w-[15px] h-[15px]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     stroke-width="2"
                   >
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="M21 21l-4.35-4.35" stroke-linecap="round" />
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline
+                      points="12 6 12 12 16 14"
+                      stroke-linecap="round"
+                    />
                   </svg>
-                  <span class="text-[12px] text-muted-fg"
-                    >Search downloads...</span
+                  <span v-if="!isCompactSidebar">History</span>
+                </div>
+                <div
+                  v-if="!isCompactSidebar"
+                  class="flex items-center gap-2.5 px-3 py-3 rounded-md text-[12px] text-muted-fg"
+                ></div>
+              </div>
+
+              <div
+                class="h-px bg-white/[0.07]"
+                :class="isCompactSidebar ? 'w-8' : ''"
+              />
+
+              <!-- Categories -->
+              <div class="flex flex-col gap-0.5">
+                <div
+                  class="rounded-md text-[12px] text-muted-fg"
+                  :class="
+                    isCompactSidebar
+                      ? 'flex h-10 w-10 items-center justify-center'
+                      : 'flex items-center gap-2.5 px-3 py-3'
+                  "
+                >
+                  <FolderArchive :size="15" :stroke-width="2" />
+                  <span v-if="!isCompactSidebar">Archives</span>
+                </div>
+                <div
+                  class="rounded-md text-[12px] text-muted-fg"
+                  :class="
+                    isCompactSidebar
+                      ? 'flex h-10 w-10 items-center justify-center'
+                      : 'flex items-center gap-2.5 px-3 py-3'
+                  "
+                >
+                  <Film :size="15" :stroke-width="2" />
+                  <span v-if="!isCompactSidebar">Media</span>
+                </div>
+                <div
+                  class="rounded-md text-[12px] text-muted-fg"
+                  :class="
+                    isCompactSidebar
+                      ? 'flex h-10 w-10 items-center justify-center'
+                      : 'flex items-center gap-2.5 px-3 py-3'
+                  "
+                >
+                  <FileText :size="15" :stroke-width="2" />
+                  <span v-if="!isCompactSidebar">Documents</span>
+                </div>
+              </div>
+
+              <!-- Storage card -->
+              <div
+                class="mt-auto rounded-lg border border-white/[0.07] bg-surface-card"
+                :class="isCompactSidebar ? 'w-full px-2 py-2.5' : 'px-3 py-3.5'"
+              >
+                <div
+                  class="mb-1.5 flex items-center gap-1.5"
+                  :class="isCompactSidebar ? 'justify-center' : ''"
+                >
+                  <Database
+                    :size="13"
+                    :stroke-width="2"
+                    class="text-secondary"
+                  />
+                  <span
+                    v-if="!isCompactSidebar"
+                    class="text-[11px] text-muted-fg"
                   >
+                    Storage
+                  </span>
+                </div>
+                <div
+                  v-if="!isCompactSidebar"
+                  class="text-[13px] leading-tight mb-0.5"
+                >
+                  <span class="font-bold">318.5</span>
+                  <span class="text-muted-fg font-medium"> / 512 GB</span>
+                </div>
+                <div
+                  v-if="!isCompactSidebar"
+                  class="text-[10px] text-muted-fg mb-2"
+                >
+                  used
+                </div>
+                <div
+                  class="h-1.5 rounded-full overflow-hidden bg-surface-hover"
+                  :class="isCompactSidebar ? 'w-full' : ''"
+                >
+                  <div class="h-full w-[62%] rounded-full bg-secondary" />
                 </div>
               </div>
             </div>
 
-            <div class="flex">
-              <!-- Mini sidebar -->
+            <!-- Main content -->
+            <div class="flex-1 px-4 py-4 flex flex-col gap-3 min-w-0">
+              <!-- Top row: stats bar + chunk map -->
               <div
-                class="w-[180px] shrink-0 border-r border-white/[0.07] px-4 py-5 flex flex-col gap-4 bg-surface-raised"
+                class="grid grid-cols-1 min-[700px]:grid-cols-[minmax(0,1fr)_240px] gap-2.5 items-stretch"
               >
-                <!-- Logo -->
-                <div class="px-1 mb-2">
-                  <Wordmark :width="168" class="block" />
-                </div>
-
-                <!-- New download btn -->
-                <button
-                  class="flex items-center gap-2 w-full px-3 py-3 rounded-md bg-accent text-bg text-[12px] font-semibold"
-                >
-                  <Download :size="14" :stroke-width="2.5" />
-                  Add Download
-                </button>
-
-                <div class="h-px bg-white/[0.07]" />
-
-                <!-- Nav -->
-                <div class="flex flex-col gap-0.5">
-                  <div
-                    class="flex items-center gap-2.5 px-3 py-3 rounded-md text-[12px] font-semibold bg-surface-hover"
-                  >
-                    <Inbox :size="15" :stroke-width="2" />
-                    Downloads
-                  </div>
-                  <div
-                    class="flex items-center gap-2.5 px-3 py-3 rounded-md text-[12px] text-muted-fg"
-                  >
-                    <svg
-                      class="w-[15px] h-[15px]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline
-                        points="12 6 12 12 16 14"
-                        stroke-linecap="round"
-                      />
-                    </svg>
-                    History
-                  </div>
-                  <div
-                    class="flex items-center gap-2.5 px-3 py-3 rounded-md text-[12px] text-muted-fg"
-                  ></div>
-                </div>
-
-                <div class="h-px bg-white/[0.07]" />
-
-                <!-- Categories -->
-                <div class="flex flex-col gap-0.5">
-                  <div
-                    class="flex items-center gap-2.5 px-3 py-3 rounded-md text-[12px] text-muted-fg"
-                  >
-                    <FolderArchive :size="15" :stroke-width="2" />
-                    Archives
-                  </div>
-                  <div
-                    class="flex items-center gap-2.5 px-3 py-3 rounded-md text-[12px] text-muted-fg"
-                  >
-                    <Film :size="15" :stroke-width="2" />
-                    Media
-                  </div>
-                  <div
-                    class="flex items-center gap-2.5 px-3 py-3 rounded-md text-[12px] text-muted-fg"
-                  >
-                    <FileText :size="15" :stroke-width="2" />
-                    Documents
-                  </div>
-                </div>
-
-                <!-- Storage card -->
                 <div
-                  class="mt-auto rounded-lg px-3 py-3.5 border border-white/[0.07] bg-surface-card"
+                  class="rounded-xl border border-white/[0.07] bg-surface-card px-4 py-4"
                 >
-                  <div class="flex items-center gap-1.5 mb-1.5">
-                    <Database
-                      :size="13"
-                      :stroke-width="2"
-                      class="text-secondary"
-                    />
-                    <span class="text-[11px] text-muted-fg">Storage</span>
-                  </div>
-                  <div class="text-[13px] leading-tight mb-0.5">
-                    <span class="font-bold">318.5</span>
-                    <span class="text-muted-fg font-medium"> / 512 GB</span>
-                  </div>
-                  <div class="text-[10px] text-muted-fg mb-2">used</div>
-                  <div
-                    class="h-1.5 rounded-full overflow-hidden bg-surface-hover"
-                  >
-                    <div class="h-full w-[62%] rounded-full bg-secondary" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Main content -->
-              <div class="flex-1 px-4 py-4 flex flex-col gap-3 min-w-0">
-                <!-- Top row: Speed chart + Chunk map -->
-                <div class="grid grid-cols-2 gap-2.5">
-                  <!-- Download speed area chart -->
-                  <div
-                    class="rounded-lg border border-white/[0.07] overflow-hidden bg-surface-card"
-                  >
-                    <div class="px-3 pt-2.5 pb-0">
-                      <div class="flex items-baseline gap-1.5">
+                  <div class="flex flex-wrap items-start justify-between gap-5">
+                    <div class="min-w-[180px] flex-1">
+                      <div class="text-[11px] font-light text-muted-fg">
+                        Download
+                      </div>
+                      <div class="mt-1 flex items-end gap-2">
                         <span
-                          class="text-[18px] font-bold tabular-nums text-accent leading-none"
-                          >{{ speedDisplay }}</span
+                          class="text-[28px] font-extrabold leading-none tabular-nums text-on-surface"
                         >
-                        <span class="text-[10px] text-muted-fg">MB/s</span>
+                          {{ speedDisplay }}
+                        </span>
+                        <span class="pb-[3px] text-sm font-light text-muted-fg">
+                          MB/s
+                        </span>
                       </div>
                     </div>
-                    <svg
-                      class="w-full h-[54px] mt-1"
-                      preserveAspectRatio="none"
-                      viewBox="0 0 100 40"
-                    >
-                      <defs>
-                        <linearGradient
-                          id="speed-grad"
-                          gradientUnits="userSpaceOnUse"
-                          x1="0"
-                          y1="-2"
-                          x2="0"
-                          :y2="CHART_H + 10"
-                        >
-                          <stop
-                            offset="0%"
-                            class="[stop-color:theme(colors.accent)]"
-                            stop-opacity="0.48"
-                          />
-                          <stop
-                            offset="58%"
-                            class="[stop-color:theme(colors.accent)]"
-                            stop-opacity="0.18"
-                          />
-                          <stop
-                            offset="100%"
-                            class="[stop-color:theme(colors.accent)]"
-                            stop-opacity="0"
-                          />
-                        </linearGradient>
-                      </defs>
-                      <path :d="areaPath" fill="url(#speed-grad)" />
-                      <path
-                        :d="linePath"
-                        fill="none"
-                        class="stroke-accent"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        vector-effect="non-scaling-stroke"
+
+                    <div class="flex min-w-[185px] items-start gap-3">
+                      <HardDrive
+                        :size="14"
+                        :stroke-width="2.2"
+                        class="mt-0.5 text-muted-fg"
                       />
-                    </svg>
+
+                      <div class="flex flex-col gap-1.5">
+                        <div class="text-[11px] font-light text-muted-fg">
+                          Disk I/O
+                        </div>
+                        <div class="flex items-start gap-5">
+                          <div>
+                            <div class="text-[11px] font-light text-muted-fg">
+                              Read
+                            </div>
+                            <div
+                              class="mt-0.5 text-[13px] font-light text-on-surface"
+                            >
+                              {{ readSpeedDisplay }} MB/s
+                            </div>
+                          </div>
+                          <div>
+                            <div class="text-[11px] font-light text-muted-fg">
+                              Write
+                            </div>
+                            <div
+                              class="mt-0.5 text-[13px] font-light text-on-surface"
+                            >
+                              {{ writeSpeedDisplay }} MB/s
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <!-- Chunk map -->
-                  <div
-                    class="rounded-lg border border-white/[0.07] bg-surface-card p-2.5"
+                  <svg
+                    class="mt-5 block h-[84px] w-full"
+                    preserveAspectRatio="none"
+                    viewBox="0 0 100 40"
                   >
-                    <!--div class="flex items-center justify-between mb-2"></div>-->
+                    <defs>
+                      <linearGradient
+                        id="speed-grad"
+                        gradientUnits="userSpaceOnUse"
+                        x1="0"
+                        y1="-2"
+                        x2="0"
+                        :y2="CHART_H + 10"
+                      >
+                        <stop
+                          offset="0%"
+                          class="[stop-color:theme(colors.accent)]"
+                          stop-opacity="0.42"
+                        />
+                        <stop
+                          offset="100%"
+                          class="[stop-color:theme(colors.accent)]"
+                          stop-opacity="0"
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <line
+                      v-for="fraction in GRID_LINES"
+                      :key="fraction"
+                      x1="0"
+                      :x2="CHART_W"
+                      :y1="(CHART_H * fraction).toFixed(2)"
+                      :y2="(CHART_H * fraction).toFixed(2)"
+                      stroke="rgba(255,255,255,0.08)"
+                      stroke-width="0.5"
+                    />
+
+                    <path :d="areaPath" fill="url(#speed-grad)" />
+                    <path
+                      :d="linePath"
+                      fill="none"
+                      class="stroke-accent"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      vector-effect="non-scaling-stroke"
+                    />
+                  </svg>
+
+                  <div
+                    class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5"
+                  >
+                    <div class="flex items-center gap-1.5 text-sm">
+                      <span class="font-light text-muted-fg">Active</span>
+                      <span class="font-extrabold text-accent">
+                        {{ activeTransfers }}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-sm">
+                      <span class="font-light text-muted-fg">Finished</span>
+                      <span class="font-extrabold text-secondary">
+                        {{ finishedTotal }}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-sm">
+                      <span class="font-light text-muted-fg">Queued</span>
+                      <span class="font-extrabold text-[#A78BFA]">
+                        {{ queuedTransfers }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="min-w-0 h-full rounded-xl border border-white/[0.07] bg-surface-card px-3 py-3 overflow-hidden flex flex-col"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="min-w-0 truncate text-[11px] text-on-surface">
+                      {{ chunkMapItem?.name ?? "Chunk map" }}
+                    </span>
+                    <span class="shrink-0 text-[10px] text-muted-fg">
+                      {{ chunkMapItem?.size ?? "—" }}
+                    </span>
+                  </div>
+
+                  <div
+                    class="mt-3 flex min-h-[110px] flex-1 flex-col justify-between gap-1.5"
+                  >
                     <div
-                      class="grid gap-[2.5px]"
+                      v-for="row in CHUNK_ROWS"
+                      :key="row"
+                      class="grid min-w-0 flex-1 gap-1"
                       :style="{
                         gridTemplateColumns: `repeat(${CHUNK_COLS}, 1fr)`,
                       }"
                     >
                       <div
-                        v-for="i in CHUNK_COLS * CHUNK_ROWS"
-                        :key="i"
-                        class="rounded-[3px] aspect-square transition-colors duration-300"
-                        :class="
-                          cellClass(
-                            (i - 1) % CHUNK_COLS,
-                            Math.floor((i - 1) / CHUNK_COLS),
-                          )
-                        "
+                        v-for="col in CHUNK_COLS"
+                        :key="`${row}-${col}`"
+                        class="h-full min-h-[8px] min-w-0 rounded-[2px] transition-colors duration-300"
+                        :class="cellClass(col - 1, row - 1)"
                       />
                     </div>
                   </div>
-                </div>
 
-                <!-- Section header -->
-                <div class="flex items-center justify-between px-1">
-                  <span
-                    class="text-[11px] uppercase tracking-widest text-muted-fg font-semibold"
-                    >Recent</span
-                  >
-                  <button
-                    class="text-[11px] text-muted-fg hover:text-on-surface-alt"
-                  >
-                    Clear
-                  </button>
-                </div>
-
-                <!-- Download rows -->
-                <TransitionGroup
-                  name="dl"
-                  tag="div"
-                  class="relative flex flex-col gap-2 overflow-hidden"
-                >
                   <div
-                    v-for="item in queue"
-                    :key="item.uid"
-                    class="flex items-center gap-3.5 px-4 py-3.5 rounded-lg border border-white/[0.07] bg-surface-card transition-opacity duration-500"
-                    :class="item.status === 'finished' ? 'opacity-40' : ''"
+                    class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-fg"
                   >
-                    <component
-                      :is="item.icon"
-                      :size="18"
-                      :stroke-width="1.5"
-                      class="text-muted-fg shrink-0"
-                    />
-
-                    <!-- Downloading: progress bar row -->
-                    <template v-if="item.status === 'downloading'">
-                      <div class="flex-1 min-w-0">
-                        <div
-                          class="flex items-center justify-between gap-3 mb-2"
-                        >
-                          <span class="text-[13px] font-semibold truncate">{{
-                            item.name
-                          }}</span>
-                          <div class="flex items-center gap-3 shrink-0">
-                            <span
-                              class="text-[11px] text-muted-fg tabular-nums w-8 text-right"
-                              >{{ progress }}%</span
-                            >
-                            <span
-                              class="text-[11px] text-muted-fg tabular-nums"
-                              >{{ item.size }}</span
-                            >
-                            <span
-                              class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold border border-white/[0.07] text-on-surface-alt"
-                              >downloading</span
-                            >
-                          </div>
-                        </div>
-                        <div
-                          class="h-1.5 rounded-full overflow-hidden bg-accent/20"
-                        >
-                          <div
-                            class="h-full rounded-full bg-accent"
-                            :style="{
-                              width: `${progress}%`,
-                              transition: 'width 80ms linear',
-                            }"
-                          />
-                        </div>
-                      </div>
-                      <div
-                        class="flex items-center gap-1.5 shrink-0 pointer-events-none"
-                      >
-                        <div
-                          class="w-7 h-7 flex items-center justify-center rounded text-muted-fg"
-                        >
-                          <Pause :size="14" :stroke-width="2.5" />
-                        </div>
-                        <div
-                          class="w-7 h-7 flex items-center justify-center rounded text-muted-fg"
-                        >
-                          <X :size="14" :stroke-width="2.5" />
-                        </div>
-                      </div>
-                    </template>
-
-                    <!-- Queued / finished: simple row -->
-                    <template v-else>
-                      <div class="flex-1 min-w-0">
-                        <div class="flex items-center justify-between gap-3">
-                          <span class="text-[13px] font-semibold truncate">{{
-                            item.status === "finished" && item.displayName
-                              ? item.displayName
-                              : item.name
-                          }}</span>
-                          <div class="flex items-center gap-3 shrink-0">
-                            <span
-                              v-if="item.status === 'queued'"
-                              class="text-[11px] text-muted-fg tabular-nums w-8 text-right"
-                              >···</span
-                            >
-                            <span
-                              class="text-[11px] text-muted-fg tabular-nums"
-                              >{{ item.size }}</span
-                            >
-                            <span
-                              class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold"
-                              :class="
-                                item.status === 'queued'
-                                  ? 'border border-white/[0.07] text-on-surface-alt'
-                                  : 'bg-secondary/20 text-secondary'
-                              "
-                              >{{ item.status }}</span
-                            >
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        v-if="item.status === 'queued'"
-                        class="flex items-center gap-1.5 shrink-0"
-                      >
-                        <button
-                          aria-label="Remove from queue"
-                          class="w-7 h-7 flex items-center justify-center rounded text-muted-fg hover:text-destructive"
-                        >
-                          <X :size="14" :stroke-width="2.5" />
-                        </button>
-                      </div>
-                    </template>
+                    <div class="flex items-center gap-1.5">
+                      <span class="h-2 w-2 rounded-[2px] bg-white/[0.08]" />
+                      Empty
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="h-2 w-2 rounded-[2px] bg-secondary" />
+                      Partial
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="h-2 w-2 rounded-[2px] bg-accent" />
+                      Complete
+                    </div>
                   </div>
-                </TransitionGroup>
+                </div>
               </div>
+
+              <!-- Section header -->
+              <div class="flex items-center justify-between px-1">
+                <span
+                  class="text-[11px] uppercase tracking-widest text-muted-fg font-semibold"
+                  >Recent</span
+                >
+                <button
+                  class="text-[11px] text-muted-fg hover:text-on-surface-alt"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <!-- Download rows -->
+              <TransitionGroup
+                name="dl"
+                tag="div"
+                class="relative flex flex-col gap-2 overflow-hidden"
+              >
+                <div
+                  v-for="item in queue"
+                  :key="item.uid"
+                  class="flex items-center gap-3.5 px-4 py-3.5 rounded-lg border border-white/[0.07] bg-surface-card transition-opacity duration-500"
+                  :class="item.status === 'finished' ? 'opacity-40' : ''"
+                >
+                  <component
+                    :is="item.icon"
+                    :size="18"
+                    :stroke-width="1.5"
+                    class="text-muted-fg shrink-0"
+                  />
+
+                  <!-- Downloading: progress bar row -->
+                  <template v-if="item.status === 'downloading'">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-3 mb-2">
+                        <span class="text-[13px] font-semibold truncate">{{
+                          item.name
+                        }}</span>
+                        <div class="flex items-center gap-3 shrink-0">
+                          <span
+                            class="text-[11px] text-muted-fg tabular-nums w-8 text-right"
+                            >{{ progress }}%</span
+                          >
+                          <span
+                            class="text-[11px] text-muted-fg tabular-nums"
+                            >{{ item.size }}</span
+                          >
+                          <span
+                            class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold border border-white/[0.07] text-on-surface-alt"
+                            >downloading</span
+                          >
+                        </div>
+                      </div>
+                      <div
+                        class="h-1.5 rounded-full overflow-hidden bg-accent/20"
+                      >
+                        <div
+                          class="h-full rounded-full bg-accent"
+                          :style="{
+                            width: `${progress}%`,
+                            transition: 'width 80ms linear',
+                          }"
+                        />
+                      </div>
+                    </div>
+                    <div
+                      class="flex items-center gap-1.5 shrink-0 pointer-events-none"
+                    >
+                      <div
+                        class="w-7 h-7 flex items-center justify-center rounded text-muted-fg"
+                      >
+                        <Pause :size="14" :stroke-width="2.5" />
+                      </div>
+                      <div
+                        class="w-7 h-7 flex items-center justify-center rounded text-muted-fg"
+                      >
+                        <X :size="14" :stroke-width="2.5" />
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Queued / finished: simple row -->
+                  <template v-else>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-3">
+                        <span class="text-[13px] font-semibold truncate">{{
+                          item.status === "finished" && item.displayName
+                            ? item.displayName
+                            : item.name
+                        }}</span>
+                        <div class="flex items-center gap-3 shrink-0">
+                          <span
+                            v-if="item.status === 'queued'"
+                            class="text-[11px] text-muted-fg tabular-nums w-8 text-right"
+                            >···</span
+                          >
+                          <span
+                            class="text-[11px] text-muted-fg tabular-nums"
+                            >{{ item.size }}</span
+                          >
+                          <span
+                            class="text-[11px] px-2.5 py-0.5 rounded-full font-semibold"
+                            :class="
+                              item.status === 'queued'
+                                ? 'border border-white/[0.07] text-on-surface-alt'
+                                : 'bg-secondary/20 text-secondary'
+                            "
+                            >{{ item.status }}</span
+                          >
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      v-if="item.status === 'queued'"
+                      class="flex items-center gap-1.5 shrink-0"
+                    >
+                      <button
+                        aria-label="Remove from queue"
+                        class="w-7 h-7 flex items-center justify-center rounded text-muted-fg hover:text-destructive"
+                      >
+                        <X :size="14" :stroke-width="2.5" />
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </TransitionGroup>
             </div>
           </div>
-        </RevealSection>
-      </div>
+        </div>
+      </RevealSection>
     </div>
   </section>
 </template>
@@ -709,15 +839,17 @@ onUnmounted(() => {
 .chunk-filled {
   background: theme("colors.accent");
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.13),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
+
 .chunk-partial {
   background: theme("colors.secondary");
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
+
 .chunk-empty {
-  background: theme("colors.on-surface / 0.04");
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .dl-enter-active,
