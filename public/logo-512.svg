@@ -1,0 +1,8 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- background -->
+  <rect width="512" height="512" />
+  <g transform="translate(256 256) scale(21.333) translate(-12 -12)">
+    <path fill-rule="evenodd" d="M12 3 A9 9 0 1 0 12 21 A9 9 0 1 0 12 3 Z M15 4.5 A7.5 7.5 0 1 0 15 19.5 A7.5 7.5 0 1 0 15 4.5 Z" fill="#6bc670"/>
+    <circle cx="15" cy="12" r="1.5" fill="#6bc670" opacity="0.45"/>
+  </g>
+</svg>

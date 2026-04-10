@@ -1,0 +1,58 @@
+<script setup lang="ts">
+import { computed } from "vue";
+
+const props = defineProps<{
+  width?: number;
+  height?: number;
+}>();
+
+const aspectRatio = 120 / 22;
+
+const svgWidth = computed(() => {
+  if (props.width) return props.width;
+  if (props.height) return props.height * aspectRatio;
+  return 120;
+});
+
+const svgHeight = computed(() => {
+  if (props.height) return props.height;
+  if (props.width) return props.width / aspectRatio;
+  return 22;
+});
+</script>
+
+<template>
+  <svg
+    :width="svgWidth"
+    :height="svgHeight"
+    viewBox="0 0 120 22"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="Ophelia"
+  >
+    <path
+      fill-rule="evenodd"
+      d="M11 2.75 A8.25 8.25 0 1 0 11 19.25 A8.25 8.25 0 1 0 11 2.75 Z M13.75 4.125 A6.875 6.875 0 1 0 13.75 17.875 A6.875 6.875 0 1 0 13.75 4.125 Z"
+      fill="oklch(0.75 0.15 145)"
+    />
+    <circle
+      cx="13.75"
+      cy="11"
+      r="1.375"
+      fill="oklch(0.75 0.15 145)"
+      opacity="0.45"
+    />
+    <text
+      x="26"
+      y="15.5"
+      font-family="system-ui, -apple-system, sans-serif"
+      font-size="14"
+      font-weight="600"
+      letter-spacing="-0.02em"
+      fill="oklch(0.97 0.002 264)"
+    >
+      ophelia
+    </text>
+  </svg>
+</template>

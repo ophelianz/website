@@ -1,0 +1,222 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-bg text-on-surface font-sans font-medium;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: theme("colors.accent / 0.2");
+    color: theme("colors.on-surface");
+  }
+}
+
+@layer components {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      135deg,
+      theme("colors.accent") 0%,
+      theme("colors.accent-dim") 50%,
+      theme("colors.accent") 100%
+    );
+  }
+
+  .glass {
+    background: theme("colors.surface / 0.75");
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid theme("colors.on-surface / 0.04");
+  }
+
+  .glass-card {
+    background: theme("colors.surface / 0.5");
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid theme("colors.on-surface / 0.04");
+  }
+
+  .prose-ophelia p {
+    @apply text-[17px] text-on-surface leading-relaxed font-semibold mb-6;
+  }
+
+  .prose-ophelia strong {
+    @apply font-bold;
+    color: inherit;
+  }
+
+  .prose-ophelia em {
+    @apply italic;
+    color: inherit;
+  }
+
+  .prose-ophelia a {
+    @apply underline underline-offset-2 hover:brightness-110 transition-all duration-150;
+    color: theme("colors.link");
+  }
+
+  .prose-ophelia h2 a,
+  .prose-ophelia h3 a,
+  .prose-ophelia h4 a {
+    @apply no-underline transition-all duration-200;
+    color: inherit;
+  }
+
+  .prose-ophelia h2 a:hover,
+  .prose-ophelia h3 a:hover,
+  .prose-ophelia h4 a:hover {
+    @apply text-accent;
+  }
+
+  .prose-ophelia :not(pre) > code {
+    @apply text-[15px] font-mono bg-accent/[0.08] text-accent/90 px-1.5 py-0.5 rounded border border-accent/[0.08];
+  }
+
+  .prose-ophelia pre {
+    @apply border border-white/[0.06] rounded-xl p-5 mb-6 overflow-x-auto text-[14px] leading-relaxed;
+    background: theme("colors.bg");
+  }
+
+  .prose-ophelia pre code {
+    @apply bg-transparent p-0 border-0 text-[14px];
+    color: inherit;
+  }
+
+  .prose-ophelia pre code .line {
+    display: block;
+  }
+
+  .prose-ophelia h2 {
+    @apply text-2xl font-bold tracking-tight mt-10 mb-4 text-accent;
+  }
+
+  .prose-ophelia h3 {
+    @apply text-xl font-bold tracking-tight mt-8 mb-3 text-accent/80;
+  }
+
+  .prose-ophelia h4 {
+    @apply text-lg font-bold tracking-tight mt-6 mb-2 text-accent/60;
+  }
+
+  .prose-ophelia ul {
+    @apply list-disc pl-5 mb-6 space-y-1.5 text-[17px] text-on-surface font-semibold;
+  }
+
+  .prose-ophelia ol {
+    @apply list-decimal pl-5 mb-6 space-y-1.5 text-[17px] text-on-surface font-semibold;
+  }
+
+  .prose-ophelia li code {
+    @apply text-[14px];
+  }
+
+  .prose-ophelia blockquote {
+    @apply border-l-2 border-accent/30 pl-4 italic text-on-surface-alt/70 mb-6 text-[17px];
+  }
+
+  .prose-ophelia hr {
+    @apply border-white/[0.06] my-10;
+  }
+
+  .prose-ophelia table {
+    @apply w-full mb-6 text-[15px];
+  }
+
+  .prose-ophelia th {
+    @apply text-left font-bold text-on-surface pb-2 border-b border-white/[0.06] px-3;
+  }
+
+  .prose-ophelia td {
+    @apply text-on-surface-alt py-2 px-3 border-b border-white/[0.04];
+  }
+
+  .prose-ophelia img {
+    @apply rounded-xl border border-white/[0.06] mb-6;
+  }
+}
+
+@layer utilities {
+  .fade-in {
+    animation: fadeIn 0.8s ease-out both;
+  }
+
+  .slide-up {
+    animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* Page transitions */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
