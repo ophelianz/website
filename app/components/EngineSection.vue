@@ -20,7 +20,6 @@ interface EngineAction {
 
 interface EngineFeature {
   value: string;
-  note: string;
   valueClass?: string;
 }
 
@@ -60,8 +59,8 @@ const balancedActions: EngineAction[] = [
     title: "Queue",
     note: "preallocate the part file, build chunk boundaries, and seed the pending range queue",
     icon: Rows3,
-    accentClass: "text-secondary bg-secondary/12 border-secondary/16",
-    activeClass: "border-secondary/20 bg-secondary/[0.06]",
+    accentClass: "text-[#7AB8FF] bg-[#7AB8FF]/12 border-[#7AB8FF]/16",
+    activeClass: "border-[#7AB8FF]/20 bg-[#7AB8FF]/[0.06]",
   },
   {
     title: "Ramp",
@@ -74,8 +73,8 @@ const balancedActions: EngineAction[] = [
     title: "Recovery",
     note: "retry inside workers, then steal or hedge the slow tail when spare capacity opens up",
     icon: RotateCcw,
-    accentClass: "text-on-surface-alt bg-white/[0.06] border-white/[0.08]",
-    activeClass: "border-white/[0.14] bg-white/[0.05]",
+    accentClass: "text-[#FF7A8A] bg-[#FF7A8A]/12 border-[#FF7A8A]/16",
+    activeClass: "border-[#FF7A8A]/20 bg-[#FF7A8A]/[0.06]",
   },
 ];
 
@@ -91,8 +90,8 @@ const sequentialActions: EngineAction[] = [
     title: "Queue",
     note: "build normal chunk boundaries and keep them lined up in strict front-to-back order",
     icon: Rows3,
-    accentClass: "text-secondary bg-secondary/12 border-secondary/16",
-    activeClass: "border-secondary/20 bg-secondary/[0.06]",
+    accentClass: "text-[#7AB8FF] bg-[#7AB8FF]/12 border-[#7AB8FF]/16",
+    activeClass: "border-[#7AB8FF]/20 bg-[#7AB8FF]/[0.06]",
   },
   {
     title: "Advance",
@@ -105,25 +104,22 @@ const sequentialActions: EngineAction[] = [
     title: "Track",
     note: "keep chunk-aware progress and coverage live while the ordered queue moves forward",
     icon: RotateCcw,
-    accentClass: "text-on-surface-alt bg-white/[0.06] border-white/[0.08]",
-    activeClass: "border-white/[0.14] bg-white/[0.05]",
+    accentClass: "text-[#FF7A8A] bg-[#FF7A8A]/12 border-[#FF7A8A]/16",
+    activeClass: "border-[#FF7A8A]/20 bg-[#FF7A8A]/[0.06]",
   },
 ];
 
 const balancedFeatures: EngineFeature[] = [
   {
-    value: "On pause",
-    note: "The chunked engine writes snapshots only when a transfer pauses, not on every tick",
+    value: "Pause with confidence",
     valueClass: "text-accent",
   },
   {
     value: "Better resume support",
-    note: "Ophelia restores the last known slot state and file layout instead of guessing from file length",
     valueClass: "text-secondary",
   },
   {
     value: "Retry, Steal & Hedge",
-    note: "Slow workers can retry, and the scheduler can split or race the slow tail when capacity opens up",
     valueClass: "text-[#C4B5FD]",
   },
 ];
@@ -131,17 +127,14 @@ const balancedFeatures: EngineFeature[] = [
 const sequentialFeatures: EngineFeature[] = [
   {
     value: "On pause",
-    note: "the same chunked engine writes pause snapshots only when the transfer actually stops",
     valueClass: "text-accent",
   },
   {
     value: "Better resume",
-    note: "resume restores the known front-to-back chunk queue instead of dropping to a plain stream",
     valueClass: "text-secondary",
   },
   {
     value: "Front first",
-    note: "one active slot keeps early bytes arriving in usable order for file types that benefit from it",
     valueClass: "text-[#C4B5FD]",
   },
 ];
@@ -248,10 +241,11 @@ const engineModes: Record<ModeId, EngineModeConfig> = {
   balanced: {
     label: "Balanced",
     badgeClass: "border-accent/20 bg-accent/8 text-accent",
-    telemetryTitle: "Ramps up toward configured limits",
+    telemetryTitle:
+      "Ophelia employs two techniques to speed up downloads, each with their own advantages",
     telemetryLabel: "Balanced download",
     telemetryNote:
-      "starts at one worker, opens more ranges as chunks finish, and uses steal or hedge when the tail slows down",
+      "In the balanced scheduler, Ophelia starts at one worker, opens more ranges as chunks finish, and uses steal or hedge when the tail slows down",
     panelTitle: "Balanced scheduler",
     panelNote:
       "Ophelia probes the server, builds the queue, ramps workers upward, and corrects the slow tail when capacity opens up.",
@@ -360,7 +354,11 @@ onUnmounted(() => {
             <span class="font-normal text-on-surface-alt">download engine</span>
           </h2>
           <p class="mx-auto mt-5 max-w-2xl text-[16px] leading-7 text-muted-fg">
-            not exactly cutting edge; but an optimized Rust engine nonetheless
+            This demo focuses on Ophelia&apos;s two intended range-aware
+            schedulers. Servers without range support or content length still
+            fall back to a simpler single-stream path outside this view. Also,
+            if this makes no sense to you- I'm sorry I tried my best to make
+            this look good lol just trust me
           </p>
         </div>
       </RevealSection>
@@ -385,12 +383,6 @@ onUnmounted(() => {
               {{ engineModes[mode].label }}
             </button>
           </div>
-
-          <p class="max-w-2xl text-center text-[12px] leading-6 text-muted-fg">
-            This demo focuses on Ophelia&apos;s two intended range-aware
-            schedulers. Servers without range support or content length still
-            fall back to a simpler single-stream path outside this view.
-          </p>
         </div>
       </RevealSection>
 
@@ -528,9 +520,6 @@ onUnmounted(() => {
                   >
                     {{ feature.value }}
                   </div>
-                  <div class="mt-1 text-[12px] text-on-surface-alt">
-                    {{ feature.note }}
-                  </div>
                 </div>
               </div>
             </div>
@@ -607,10 +596,10 @@ onUnmounted(() => {
                       index === 0
                         ? 'bg-accent'
                         : index === 1
-                          ? 'bg-secondary'
+                          ? 'bg-[#7AB8FF]'
                           : index === 2
                             ? 'bg-[#A78BFA]'
-                            : 'bg-white/[0.45]'
+                            : 'bg-[#FF7A8A]'
                     "
                     :style="{
                       width: currentEngineState.activeSteps.includes(index)

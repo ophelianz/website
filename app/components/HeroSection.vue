@@ -48,7 +48,7 @@ const currentSpeed = computed(
   () => speedPoints.value[speedPoints.value.length - 1] ?? 0,
 );
 const finishedTotal = ref(184);
-const activeTransfers = ref(3);
+const activeTransfers = ref(1);
 const queuedTransfers = ref(6);
 
 const speedDisplay = computed(() => currentSpeed.value.toFixed(1));
@@ -218,7 +218,7 @@ let handleSidebarMediaChange:
 function onDownloadComplete() {
   downloadDone.value = true;
   finishedTotal.value += 1;
-  activeTransfers.value = 2;
+  activeTransfers.value = 0;
   queuedTransfers.value = 5;
   // mark front item finished so it shows the finished badge briefly
   queue.value = [
@@ -235,7 +235,7 @@ function onDownloadComplete() {
 function startCycle() {
   downloadDone.value = false;
   progress.value = 0;
-  activeTransfers.value = 3;
+  activeTransfers.value = 1;
   queuedTransfers.value = 6;
   // promote front queued item to downloading
   queue.value = [
@@ -725,7 +725,7 @@ onUnmounted(() => {
                 <div
                   v-for="item in queue"
                   :key="item.uid"
-                  class="flex items-center gap-3.5 px-4 py-3.5 rounded-lg border border-white/[0.07] bg-surface-card transition-opacity duration-500"
+                  class="flex min-h-[72px] items-center gap-3.5 rounded-lg border border-white/[0.07] bg-surface-card px-4 py-3.5 transition-opacity duration-500"
                   :class="item.status === 'finished' ? 'opacity-40' : ''"
                 >
                   <component
@@ -815,6 +815,7 @@ onUnmounted(() => {
                           >
                         </div>
                       </div>
+                      <div class="mt-2 h-1.5 opacity-0" aria-hidden="true" />
                     </div>
                     <div
                       v-if="item.status === 'queued'"

@@ -47,19 +47,18 @@ watch(isVisible, (visible) => {
 </script>
 
 <template>
-  <section class="py-32 relative">
-    <div class="max-w-6xl mx-auto px-6">
+  <section class="relative py-24">
+    <div class="mx-auto max-w-6xl px-6">
       <RevealSection>
-        <div class="text-center mb-16">
-          <p
-            class="text-xs uppercase tracking-widest text-accent mb-4 font-bold"
-          >
-            Browser Integration
-          </p>
-          <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
-            It's the 21st century,<br />
-            <span class="text-on-surface-alt">just ditch IDM</span>
+        <div class="mx-auto mb-16 max-w-3xl text-center">
+          <h2 class="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+            It&apos;s the 21st century,
+            <span class="font-normal text-on-surface-alt">just ditch IDM</span>
           </h2>
+          <p class="mx-auto mt-5 max-w-2xl text-[15px] leading-7 text-muted-fg">
+            Catch browser downloads, hand them to Ophelia, and skip the dated
+            popup-software routine entirely.
+          </p>
         </div>
       </RevealSection>
 
@@ -239,14 +238,6 @@ watch(isVisible, (visible) => {
             </div>
           </Transition>
         </div>
-      </RevealSection>
-
-      <RevealSection :delay="200">
-        <p
-          class="text-center text-on-surface-alt text-[15px] font-normal mt-10 max-w-md mx-auto"
-        >
-          genuinely why do people still pay for this
-        </p>
       </RevealSection>
     </div>
   </section>
