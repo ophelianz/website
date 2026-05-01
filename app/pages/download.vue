@@ -61,8 +61,11 @@ const detectedBuildLabel = computed(() => {
 });
 
 function buildDownloadUrl(asset: string, channel: ReleaseChannel) {
-  const releaseRef = channel === "nightly" ? "nightly" : "latest";
-  return `https://github.com/ophelianz/ophelia/releases/${releaseRef}/download/${asset}`;
+  if (channel === "nightly") {
+    return `https://github.com/ophelianz/ophelia/releases/download/nightly/${asset}`;
+  }
+
+  return `https://github.com/ophelianz/ophelia/releases/latest/download/${asset}`;
 }
 
 function detectMacBuild(): BuildArch | null {
