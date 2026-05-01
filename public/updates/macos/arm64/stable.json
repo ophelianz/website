@@ -1,0 +1,11 @@
+{
+  "channel": "stable",
+  "version": "0.1.0",
+  "pub_date": "2026-05-01T00:00:00Z",
+  "commit": null,
+  "notes_url": "https://github.com/ophelianz/ophelia/releases",
+  "asset_url": "https://github.com/ophelianz/ophelia/releases/download/v0.1.0/Ophelia-macos-arm64.zip",
+  "asset_size": 0,
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "minisign_url": "https://github.com/ophelianz/ophelia/releases/download/v0.1.0/Ophelia-macos-arm64.zip.minisig"
+}

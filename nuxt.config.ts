@@ -61,7 +61,9 @@ export default defineNuxtConfig({
     "/devlog/**": { prerender: true },
     "/updates/**": {
       headers: {
-        "cache-control": "no-store, max-age=0",
+        "cache-control": "no-store, no-cache, max-age=0, must-revalidate",
+        "cdn-cache-control": "no-store",
+        "vercel-cdn-cache-control": "no-store",
       },
     },
   },
