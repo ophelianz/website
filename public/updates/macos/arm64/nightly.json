@@ -1,11 +1,11 @@
 {
   "channel": "nightly",
-  "version": "nightly-8b8ac1e",
-  "pub_date": "2026-04-30T04:49:53-07:00",
-  "commit": "8b8ac1ed89a7124989cb509b72cef6a853d22ada",
+  "version": "nightly-b29d5ae",
+  "pub_date": "2026-05-01T02:50:48-07:00",
+  "commit": "b29d5aebb8d02ff96e4ccfc798a44663d6013476",
   "notes_url": "https://github.com/ophelianz/ophelia/releases/tag/nightly",
   "asset_url": "https://github.com/ophelianz/ophelia/releases/download/nightly/Ophelia-macos-arm64.zip",
-  "asset_size": 12262016,
-  "sha256": "1866e01a6860eed564541d5eadc92fb763712ec6741e8da0a675fbf02426fa55",
+  "asset_size": 13599190,
+  "sha256": "2a9df83e49df5c33108b9b90b98c7f7df69576a19072ba63d47802f41d8a5c2f",
   "minisign_url": "https://github.com/ophelianz/ophelia/releases/download/nightly/Ophelia-macos-arm64.zip.minisig"
 }
